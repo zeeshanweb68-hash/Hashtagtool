@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hashtag Generator & Caption Cleaner</title>
+<style>
+:root{
+  --bg:#f3f6f1; --card:#ffffff; --ink:#14261c; --muted:#5b6b61;
+  --green:#0f4d34; --green2:#1b6b49; --gold:#c9a227; --line:#dfe6df; --chip:#e8f0ea;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#0b1710; --card:#122219; --ink:#eaf2ec; --muted:#9db0a4; --line:#223a2c; --chip:#1a3226; --green:#2f9a6c; --green2:#3fb883;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.5;padding:16px}
+.wrap{max-width:680px;margin:0 auto}
+header{padding:22px 4px 14px}
+h1{font-size:1.7rem;margin:0 0 4px;color:var(--green)}
+header p{margin:0;color:var(--muted);font-family:system-ui,sans-serif;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;border-top:3px solid var(--gold)}
+h2{font-size:1.1rem;margin:0 0 10px}
+textarea{width:100%;min-height:150px;resize:vertical;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:1rem/1.5 system-ui,sans-serif}
+textarea:focus,button:focus-visible,.chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+button{font:600 .95rem system-ui,sans-serif;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;background:var(--green);color:#fff;flex:1 1 auto}
+button.alt{background:var(--chip);color:var(--ink)}
+button.gold{background:var(--gold);color:#1d1600}
+.meta{font:.85rem system-ui,sans-serif;color:var(--muted);margin-top:8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.over{color:#c0392b;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.chip{font:.9rem system-ui,sans-serif;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer;flex:0 0 auto}
+.chip[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;min-height:40px}
+.tag{font:.88rem system-ui,sans-serif;padding:5px 10px;border-radius:8px;background:var(--chip);cursor:pointer;border:1px solid transparent}
+.tag.off{opacity:.35;text-decoration:line-through}
+.hint{font:.85rem system-ui,sans-serif;color:var(--muted);margin:0 0 10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font:.9rem system-ui,sans-serif;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Hashtag Generator & Caption Cleaner</h1>
+    <p>Caption paste karo, saaf karo, aur niche ke hisaab se hashtags copy karo.</p>
+  </header>
+
+  <section class="card">
+    <h2>1. Caption saaf karo</h2>
+    <textarea id="cap" placeholder="Apna caption yahan paste karein..." aria-label="Caption"></textarea>
+    <div class="meta"><span id="count">0 characters</span><span id="limit">Instagram limit: 2200</span></div>
+    <div class="row">
+      <button id="clean">Line-breaks hatao</button>
+      <button id="spaces" class="alt">Extra spaces hatao</button>
+      <button id="strip" class="alt">Purane hashtags hatao</button>
+      <button id="copyCap" class="gold">Caption copy karo</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Niche chuno</h2>
+    <div class="chips" id="chips" role="group" aria-label="Niche"></div>
+    <p class="hint">Kisi hashtag par tap karke use hata sakte hain.</p>
+    <div class="tags" id="tags"></div>
+    <div class="row">
+      <button id="copyTags">Hashtags copy karo</button>
+      <button id="addToCap" class="alt">Caption ke end mein jodo</button>
+      <button id="shuffle" class="alt">Shuffle (30 max)</button>
+    </div>
+    <div class="meta"><span id="tagCount">0 hashtags</span><span>Instagram par 30 tak allowed</span></div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = {
+  "Islamic": ["#Islam","#Muslim","#Quran","#Hadith","#Reminder","#Deen","#Iman","#Sunnah","#Allah","#Dua","#Ramadan","#Jummah","#Sabr","#Tawakkul","#IslamicReminders","#Alhamdulillah","#SubhanAllah","#Ameen"],
+  "Motivation": ["#Motivation","#Mindset","#Success","#Growth","#Discipline","#Goals","#Hustle","#SelfImprovement","#Inspiration","#NeverGiveUp","#Focus","#Positivity"],
+  "Travel": ["#Travel","#Wanderlust","#Explore","#TravelGram","#Adventure","#Nature","#Vacation","#TravelPhotography","#Roadtrip","#Backpacking","#Trip","#Incredible"],
+  "Food": ["#Foodie","#FoodLovers","#Yummy","#Recipe","#HomeMade","#Delicious","#FoodPhotography","#Cooking","#Tasty","#StreetFood","#Chef","#Instafood"],
+  "Fitness": ["#Fitness","#Workout","#Gym","#Health","#Training","#FitLife","#Motivation","#Strength","#Cardio","#Wellness","#Yoga","#Healthy"],
+  "Fashion": ["#Fashion","#Style","#OOTD","#Outfit","#Trending","#Look","#StreetStyle","#Model","#Beauty","#Aesthetic","#FashionBlogger","#Wardrobe"],
+  "Tech": ["#Tech","#AI","#Coding","#Developer","#Gadgets","#Innovation","#Startup","#Software","#Programming","#Future","#Apps","#Digital"],
+  "Business": ["#Business","#Entrepreneur","#Marketing","#Branding","#Startup","#SmallBusiness","#SocialMedia","#Money","#Leadership","#Growth","#Sales","#Content"]
+};
+const $ = id => document.getElementById(id);
+let current = "Islamic", tags = [], off = new Set();
+
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1500)}
+async function copy(text){
+  try{await navigator.clipboard.writeText(text);toast("Copy ho gaya")}
+  catch(e){const a=document.createElement("textarea");a.value=text;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast("Copy ho gaya")}catch(_){toast("Copy nahi hua")}a.remove()}
+}
+function updateCount(){
+  const n=$("cap").value.length;$("count").textContent=n+" characters";
+  $("count").className=n>2200?"over":"";
+}
+$("cap").addEventListener("input",updateCount);
+$("clean").onclick=()=>{$("cap").value=$("cap").value.replace(/\r?\n+/g," ").replace(/\s{2,}/g," ").trim();updateCount();toast("Line-breaks hat gaye")};
+$("spaces").onclick=()=>{$("cap").value=$("cap").value.replace(/[ \t]{2,}/g," ").replace(/\n{3,}/g,"\n\n").split("\n").map(l=>l.trim()).join("\n").trim();updateCount();toast("Extra spaces hat gaye")};
+$("strip").onclick=()=>{$("cap").value=$("cap").value.replace(/#[\p{L}\p{N}_]+/gu,"").replace(/[ \t]{2,}/g," ").trim();updateCount();toast("Hashtags hat gaye")};
+$("copyCap").onclick=()=>{$("cap").value.trim()?copy($("cap").value):toast("Pehle caption paste karein")};
+
+function active(){return tags.filter(t=>!off.has(t)).slice(0,30)}
+function renderTags(){
+  $("tags").innerHTML="";
+  tags.forEach(t=>{
+    const s=document.createElement("button");s.type="button";s.className="tag"+(off.has(t)?" off":"");s.textContent=t;
+    s.style.flex="0 0 auto";s.onclick=()=>{off.has(t)?off.delete(t):off.add(t);renderTags()};
+    $("tags").appendChild(s);
+  });
+  const n=active().length;$("tagCount").textContent=n+" hashtags";
+}
+function pick(cat){current=cat;tags=[...DATA[cat]];off=new Set();
+  document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",c.dataset.c===cat));renderTags()}
+Object.keys(DATA).forEach(k=>{
+  const b=document.createElement("button");b.type="button";b.className="chip";b.dataset.c=k;b.textContent=k;
+  b.setAttribute("aria-pressed","false");b.onclick=()=>pick(k);$("chips").appendChild(b);
+});
+$("copyTags").onclick=()=>{const a=active();a.length?copy(a.join(" ")):toast("Koi hashtag nahi bacha")};
+$("addToCap").onclick=()=>{const a=active();if(!a.length)return toast("Koi hashtag nahi bacha");
+  const c=$("cap").value.replace(/\s+$/,"");$("cap").value=(c?c+"\n\n":"")+a.join(" ");updateCount();toast("Caption mein jud gaye")};
+$("shuffle").onclick=()=>{tags=[...tags].sort(()=>Math.random()-.5);renderTags()};
+pick("Islamic");
+</script>
+</body>
+</html>
